@@ -194,7 +194,7 @@ describe Google::Cloud::Storage::Bucket, :generate_signed_post_policy_v4, :stora
     fields = {
       "success_action_status" => "200"
     }
-    post_object = bucket.generate_signed_post_policy_v4 "test-object", expires: 10, fields: fields
+    post_object = bucket.generate_signed_post_policy_v4 "test-object", expires: 10, fields: fields                                               
 
     _(post_object.fields.keys.sort).must_equal [
       "key",
@@ -220,6 +220,227 @@ describe Google::Cloud::Storage::Bucket, :generate_signed_post_policy_v4, :stora
     response = http.request request
 
     _(response.code).must_equal "200"
+    file = bucket.file(post_object.fields["key"])
+    _(file).wont_be :nil?
+    Tempfile.open ["google-cloud-logo", ".jpg"] do |tmpfile|
+      tmpfile.binmode
+      downloaded = file.download tmpfile
+      _(File.read(downloaded.path, mode: "rb")).must_equal File.read(data, mode: "rb")
+    end
+  end
+
+  it "generates a signed post object v4 with success_action_status with starts-with conditions " do
+    iam_client = Google::Apis::IamcredentialsV1::IAMCredentialsService.new
+    # Get the environment configured authorization
+    iam_client.authorization = bucket.service.credentials.client
+
+    # Only defined when using a service account
+    issuer = iam_client.authorization.issuer
+    signer = lambda do |string_to_sign|
+      request = {
+        "payload": string_to_sign,
+      }
+      resource = "projects/-/serviceAccounts/#{issuer}"
+      response = iam_client.sign_service_account_blob resource, request, {}
+      response.signed_blob
+    end
+    conditions = [ ["starts-with", "$key", ""] ]
+    fields = {
+      "success_action_status" => "200"
+    }
+    post_object = bucket.generate_signed_post_policy_v4 "test-object", expires: 10, fields: fields, conditions: conditions, issuer: issuer, signer: signer
+
+    _(post_object.fields.keys.sort).must_equal [
+      "key",
+      "policy",
+      "success_action_status",
+      "x-goog-algorithm",
+      "x-goog-credential",
+      "x-goog-date",
+      "x-goog-signature"
+    ]
+
+    form_data = [["file", File.open(data)]]
+
+    post_object.fields.each do |key, value|
+      form_data.push [key, value]
+    end
+
+    http = Net::HTTP.new uri.host, uri.port
+    http.use_ssl = true
+    request = Net::HTTP::Post.new post_object.url
+    request.set_form form_data, "multipart/form-data"
+
+    response = http.request request
+    puts "+++++++++++++++++"
+    puts response.body.inspect
+
+    _(response.code).must_equal "200"
+    file = bucket.file(post_object.fields["key"])
+    _(file).wont_be :nil?
+    Tempfile.open ["google-cloud-logo", ".jpg"] do |tmpfile|
+      tmpfile.binmode
+      downloaded = file.download tmpfile
+      _(File.read(downloaded.path, mode: "rb")).must_equal File.read(data, mode: "rb")
+    end
+  end
+
+  it "generates a signed post object v4 with success_action_redirect" do
+    iam_client = Google::Apis::IamcredentialsV1::IAMCredentialsService.new
+    # Get the environment configured authorization
+    iam_client.authorization = bucket.service.credentials.client
+
+    # Only defined when using a service account
+    issuer = iam_client.authorization.issuer
+    signer = lambda do |string_to_sign|
+      request = {
+        "payload": string_to_sign,
+      }
+      resource = "projects/-/serviceAccounts/#{issuer}"
+      response = iam_client.sign_service_account_blob resource, request, {}
+      response.signed_blob
+    end
+    
+    fields = {
+      "success_action_redirect" => "http://localhost:3000/banker/final_qc_loan_tapes/files_processing"
+    }
+    post_object = bucket.generate_signed_post_policy_v4 "test-object", expires: 10, fields: fields, issuer: issuer, signer: signer
+
+    _(post_object.fields.keys.sort).must_equal [
+      "key",
+      "policy",
+      "success_action_redirect",
+      "x-goog-algorithm",
+      "x-goog-credential",
+      "x-goog-date",
+      "x-goog-signature"
+    ]
+
+    form_data = [["file", File.open(data)]]
+
+    post_object.fields.each do |key, value|
+      form_data.push [key, value]
+    end
+
+    http = Net::HTTP.new uri.host, uri.port
+    http.use_ssl = true
+    request = Net::HTTP::Post.new post_object.url
+    request.set_form form_data, "multipart/form-data"
+
+    response = http.request request
+    puts "+++++++++++++++++________________________"
+    puts response.body.inspect
+
+    _(response.code).must_equal "303"
+    file = bucket.file(post_object.fields["key"])
+    _(file).wont_be :nil?
+    Tempfile.open ["google-cloud-logo", ".jpg"] do |tmpfile|
+      tmpfile.binmode
+      downloaded = file.download tmpfile
+      _(File.read(downloaded.path, mode: "rb")).must_equal File.read(data, mode: "rb")
+    end
+  end
+
+  it "generates a signed post object v4 with success_action_redirect with success_action_redirect conditions " do
+    iam_client = Google::Apis::IamcredentialsV1::IAMCredentialsService.new
+    # Get the environment configured authorization
+    iam_client.authorization = bucket.service.credentials.client
+
+    # Only defined when using a service account
+    issuer = iam_client.authorization.issuer
+    signer = lambda do |string_to_sign|
+      request = {
+        "payload": string_to_sign,
+      }
+      resource = "projects/-/serviceAccounts/#{issuer}"
+      response = iam_client.sign_service_account_blob resource, request, {}
+      response.signed_blob
+    end
+    conditions = [ { "success_action_redirect" => "http://localhost:3000/banker/final_qc_loan_tapes/files_processing" }]
+    fields = {
+      "success_action_redirect" => "http://localhost:3000/banker/final_qc_loan_tapes/files_processing"
+    }
+    post_object = bucket.generate_signed_post_policy_v4 "test-object", expires: 10, fields: fields, conditions: conditions, issuer: issuer, signer: signer
+
+    _(post_object.fields.keys.sort).must_equal [
+      "key",
+      "policy",
+      "success_action_redirect",
+      "x-goog-algorithm",
+      "x-goog-credential",
+      "x-goog-date",
+      "x-goog-signature"
+    ]
+
+    form_data = [["file", File.open(data)]]
+
+    post_object.fields.each do |key, value|
+      form_data.push [key, value]
+    end
+    
+    http = Net::HTTP.new uri.host, uri.port
+    http.use_ssl = true
+    request = Net::HTTP::Post.new post_object.url
+    request.set_form form_data, "multipart/form-data"
+    
+    response = http.request request
+    puts "+++++++++++++++++________________________!!!!!!!!!!!!!!!!!!!!!!!!"
+    puts response.body.inspect
+    _(response.code).must_equal "303"
+    file = bucket.file(post_object.fields["key"])
+    _(file).wont_be :nil?
+    Tempfile.open ["google-cloud-logo", ".jpg"] do |tmpfile|
+      tmpfile.binmode
+      downloaded = file.download tmpfile
+      _(File.read(downloaded.path, mode: "rb")).must_equal File.read(data, mode: "rb")
+    end
+  end
+  
+  it "generates a signed post object v4 with success_action_redirect with start_with condition" do
+    iam_client = Google::Apis::IamcredentialsV1::IAMCredentialsService.new
+    # Get the environment configured authorization
+    iam_client.authorization = bucket.service.credentials.client
+
+    # Only defined when using a service account
+    issuer = iam_client.authorization.issuer
+    signer = lambda do |string_to_sign|
+      request = {
+        "payload": string_to_sign,
+      }
+      resource = "projects/-/serviceAccounts/#{issuer}"
+      response = iam_client.sign_service_account_blob resource, request, {}
+      response.signed_blob
+    end
+    conditions = [["starts-with","$acl","public"]]
+    fields = {
+      "success_action_redirect" => "http://localhost:3000/banker/final_qc_loan_tapes/files_processing"
+    }
+    post_object = bucket.generate_signed_post_policy_v4 "test-object", expires: 10, fields: fields, conditions: conditions, issuer: issuer, signer: signer
+
+    _(post_object.fields.keys.sort).must_equal [
+      "key",
+      "policy",
+      "success_action_redirect",
+      "x-goog-algorithm",
+      "x-goog-credential",
+      "x-goog-date",
+      "x-goog-signature"
+    ]
+
+    form_data = [["file", File.open(data)]]
+
+    post_object.fields.each do |key, value|
+      form_data.push [key, value]
+    end
+    http = Net::HTTP.new uri.host, uri.port
+    http.use_ssl = true
+    request = Net::HTTP::Post.new post_object.url
+    request.set_form form_data, "multipart/form-data"
+
+    response = http.request request
+    puts "+++++++++++++++++________________________!!!!!!!!!!!!!!!!!!!!!!!!+++++++++++++++++++++++++"
+    puts response.body.inspect
+    _(response.code).must_equal "303"
     file = bucket.file(post_object.fields["key"])
     _(file).wont_be :nil?
     Tempfile.open ["google-cloud-logo", ".jpg"] do |tmpfile|
